@@ -15,6 +15,7 @@ mod connection_finalization;
 pub mod credssp;
 mod license_exchange;
 mod server_name;
+mod hmac;
 
 use core::any::Any;
 use core::fmt;
@@ -28,6 +29,7 @@ use ironrdp_pdu::{gcc, PduHint};
 pub use license_exchange::{LicenseExchangeSequence, LicenseExchangeState};
 pub use server_name::ServerName;
 pub use sspi;
+use ironrdp_pdu::rdp::session_info::ServerAutoReconnect;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -145,6 +147,7 @@ pub struct Config {
     pub platform: capability_sets::MajorPlatformType,
     /// If true, the INFO_AUTOLOGON flag is set in the [`ClientInfoPdu`](ironrdp_pdu::rdp::ClientInfoPdu)
     pub autologon: bool,
+    pub auto_reconnect: Option<ServerAutoReconnect>,
 
     // FIXME(@CBenoit): these are client-only options, not part of the connector.
     pub no_server_pointer: bool,

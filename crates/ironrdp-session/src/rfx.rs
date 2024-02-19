@@ -1,9 +1,11 @@
 use std::cmp::min;
+use std::io::Read;
+use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 
 use ironrdp_graphics::color_conversion::{self, YCbCrBuffer};
 use ironrdp_graphics::rectangle_processing::Region;
 use ironrdp_graphics::{dwt, quantization, rlgr, subband_reconstruction};
-use ironrdp_pdu::codecs::rfx::{self, EntropyAlgorithm, Headers, Quant, RfxRectangle, Tile};
+use ironrdp_pdu::codecs::rfx::{self, BlockType, EntropyAlgorithm, Headers, Quant, RfxRectangle, Tile};
 use ironrdp_pdu::geometry::{InclusiveRectangle, Rectangle};
 use ironrdp_pdu::PduBufferParsing;
 
@@ -98,6 +100,14 @@ impl DecodingContext {
         let height = channel.height.as_u16();
         let entropy_algorithm = self.context.entropy_algorithm;
 
+        while input[0]!=0xC4 || input[1]!=0xCC {
+            let block_type = input.read_u16::<LittleEndian>().unwrap();
+            let block_len = input.read_u32::<LittleEndian>().unwrap();
+            _=block_type;
+            error!(?block_type, ?block_len, "non-begin block");
+            let mut v = vec![0u8; (block_len - 6) as usize];
+            input.read_exact(&mut v).unwrap();
+        }
         let frame_begin = rfx::FrameBeginPdu::from_buffer_consume(input)?;
         let mut region = rfx::RegionPdu::from_buffer_consume(input)?;
         let tile_set = rfx::TileSetPdu::from_buffer_consume(input)?;
@@ -113,14 +123,14 @@ impl DecodingContext {
         }
         let region = region;
 
-        debug!(frame_index = frame_begin.index);
-        trace!(destination_rectangle = ?destination);
-        trace!(context = ?self.context);
-        trace!(channels = ?self.channels);
-        trace!(?region);
+        error!(frame_index = frame_begin.index);
+        error!(destination_rectangle = ?destination);
+        error!(context = ?self.context);
+        error!(channels = ?self.channels);
+        error!(?region);
 
         let clipping_rectangles = clipping_rectangles(region.rectangles.as_slice(), destination, width, height);
-        trace!("Clipping rectangles: {:?}", clipping_rectangles);
+        error!("Clipping rectangles: {:?}", clipping_rectangles);
 
         let mut final_update_rectangle = clipping_rectangles.extents.clone();
 

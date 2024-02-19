@@ -7,6 +7,7 @@ use ironrdp_pdu::input::fast_path::{FastPathInput, FastPathInputEvent};
 use ironrdp_pdu::rdp::headers::ShareDataPdu;
 use ironrdp_pdu::write_buf::WriteBuf;
 use ironrdp_pdu::{mcs, Action, PduParsing};
+use ironrdp_pdu::rdp::session_info::ServerAutoReconnect;
 use ironrdp_svc::{SvcProcessor, SvcProcessorMessages};
 
 use crate::fast_path::UpdateKind;
@@ -201,6 +202,7 @@ pub enum ActiveStageOutput {
     PointerPosition { x: u16, y: u16 },
     PointerBitmap(Rc<DecodedPointer>),
     Terminate(GracefulDisconnectReason),
+    AutoReconnectInfo(ServerAutoReconnect)
 }
 
 impl TryFrom<x224::ProcessorOutput> for ActiveStageOutput {
@@ -208,6 +210,7 @@ impl TryFrom<x224::ProcessorOutput> for ActiveStageOutput {
 
     fn try_from(value: x224::ProcessorOutput) -> Result<Self, Self::Error> {
         match value {
+            x224::ProcessorOutput::AutoReconnectInfo(reconnect) => Ok(Self::AutoReconnectInfo(reconnect)),
             x224::ProcessorOutput::ResponseFrame(frame) => Ok(Self::ResponseFrame(frame)),
             x224::ProcessorOutput::Disconnect(reason) => {
                 let reason = match reason {

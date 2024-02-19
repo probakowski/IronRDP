@@ -4,10 +4,12 @@ use byteorder::WriteBytesExt;
 use ironrdp_pdu::geometry::{InclusiveRectangle, Rectangle as _};
 use num_derive::ToPrimitive;
 use num_traits::ToPrimitive as _;
+use tracing::debug;
 
 const MIN_ALPHA: u8 = 0x00;
 const MAX_ALPHA: u8 = 0xff;
 
+#[derive(Debug)]
 pub struct ImageRegionMut<'a> {
     pub region: InclusiveRectangle,
     pub step: u16,
@@ -24,6 +26,8 @@ pub struct ImageRegion<'a> {
 
 impl ImageRegion<'_> {
     pub fn copy_to(&self, other: &mut ImageRegionMut<'_>) -> io::Result<()> {
+        debug!("copying {:?} to {:?}", self.region, other.region);
+
         let width = usize::from(other.region.width());
         let height = usize::from(other.region.height());
 
@@ -50,6 +54,9 @@ impl ImageRegion<'_> {
         } else {
             usize::from(other.step)
         };
+
+        let data_len = other.data.len();
+        debug!(?other.step, ?dst_step, ?data_len, "???");
 
         if self.pixel_format.eq_no_alpha(other.pixel_format) {
             for y in 0..height {

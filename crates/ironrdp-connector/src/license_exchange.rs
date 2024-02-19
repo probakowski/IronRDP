@@ -105,7 +105,7 @@ impl Sequence for LicenseExchangeSequence {
                 match initial_server_license.message_type {
                     server_license::InitialMessageType::LicenseRequest(license_request) => {
                         let mut client_random = [0u8; server_license::RANDOM_NUMBER_SIZE];
-                        OsRng.fill_bytes(&mut client_random);
+                        // OsRng.fill_bytes(&mut client_random);
 
                         let mut premaster_secret = [0u8; server_license::PREMASTER_SECRET_SIZE];
                         OsRng.fill_bytes(&mut premaster_secret);
