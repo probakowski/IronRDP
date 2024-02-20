@@ -8,10 +8,8 @@ use ironrdp_connector::legacy::SendDataIndicationCtx;
 use ironrdp_connector::GraphicsConfig;
 use ironrdp_pdu::dvc::FieldType;
 use ironrdp_pdu::mcs::{DisconnectProviderUltimatum, DisconnectReason, McsMessage};
-use ironrdp_pdu::PduParsing;
 use ironrdp_pdu::rdp::headers::ShareDataPdu;
 use ironrdp_pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode, ServerSetErrorInfoPdu};
-use ironrdp_pdu::rdp::session_info::{InfoData, ServerAutoReconnect};
 use ironrdp_pdu::rdp::vc::dvc;
 use ironrdp_pdu::write_buf::WriteBuf;
 use ironrdp_svc::{client_encode_svc_messages, StaticChannelSet, SvcMessage, SvcProcessor, SvcProcessorMessages};
@@ -31,8 +29,6 @@ pub enum ProcessorOutput {
     ResponseFrame(Vec<u8>),
     /// A graceful disconnect notification. Client should close the connection upon receiving this.
     Disconnect(DisconnectReason),
-    /// An info that can be used to calculate autoreconnect cookie
-    AutoReconnectInfo(ServerAutoReconnect)
 }
 
 pub struct Processor {
@@ -121,7 +117,7 @@ impl Processor {
         }
     }
 
-    fn process_io_channel(&mut self, data_ctx: SendDataIndicationCtx<'_>) -> SessionResult<Vec<ProcessorOutput>> {
+    fn process_io_channel(&self, data_ctx: SendDataIndicationCtx<'_>) -> SessionResult<Vec<ProcessorOutput>> {
         debug_assert_eq!(data_ctx.channel_id, self.io_channel_id);
 
         let ctx = ironrdp_connector::legacy::decode_share_data(data_ctx).map_err(crate::legacy::map_error)?;
@@ -129,11 +125,6 @@ impl Processor {
         match ctx.pdu {
             ShareDataPdu::SaveSessionInfo(session_info) => {
                 debug!("Got Session Save Info PDU: {session_info:?}");
-                if let InfoData::LogonExtended(extendedInfo) = session_info.info_data {
-                    if let Some(auto_reconnect) = extendedInfo.auto_reconnect {
-                        return Ok(vec![ProcessorOutput::AutoReconnectInfo(auto_reconnect)])
-                    }
-                }
                 Ok(Vec::new())
             }
             ShareDataPdu::ServerSetErrorInfo(ServerSetErrorInfoPdu(ErrorInfo::ProtocolIndependentCode(
@@ -386,7 +377,6 @@ fn create_dvc(
     channel_id_type: FieldType,
     graphics_handler: &mut Option<Box<dyn GfxHandler + Send>>,
 ) -> Option<DynamicChannel> {
-    warn!("Registering channel {}", channel_name);
     match channel_name {
         RDP8_GRAPHICS_PIPELINE_NAME => {
             let handler = graphics_handler.take();

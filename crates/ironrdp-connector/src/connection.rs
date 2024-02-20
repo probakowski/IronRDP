@@ -1,12 +1,9 @@
-use std::io::Write;
 use std::mem;
 use std::net::SocketAddr;
-use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 
 use ironrdp_pdu::rdp::capability_sets::CapabilitySet;
 use ironrdp_pdu::write_buf::WriteBuf;
-use ironrdp_pdu::{gcc, mcs, nego, rdp, PduHint, PduParsing};
-use ironrdp_pdu::rdp::client_info::{DayOfWeek, DayOfWeekOccurrence, Month, PerformanceFlags, SystemTime, TimezoneInfo};
+use ironrdp_pdu::{gcc, mcs, nego, rdp, PduHint};
 use ironrdp_svc::{StaticChannelSet, StaticVirtualChannel, SvcClientProcessor};
 
 use crate::channel_connection::{ChannelConnectionSequence, ChannelConnectionState};
@@ -15,7 +12,6 @@ use crate::license_exchange::LicenseExchangeSequence;
 use crate::{
     legacy, Config, ConnectorError, ConnectorErrorExt as _, ConnectorResult, DesktopSize, Sequence, State, Written,
 };
-use crate::hmac::hmac;
 
 const DEFAULT_POINTER_CACHE_SIZE: u16 = 32;
 
@@ -771,65 +767,14 @@ fn create_client_info_pdu(config: &Config, routing_addr: &SocketAddr) -> rdp::Cl
             },
             address: routing_addr.ip().to_string(),
             dir: config.client_dir.clone(),
-            optional_data: ExtendedClientOptionalInfo {
-                timezone: Some(TimezoneInfo {
-                    bias: 0x01e0,
-                    standard_name: String::from("Pacific Standard Time"),
-                    standard_date: Some(SystemTime {
-                        month: Month::October,
-                        day_of_week: DayOfWeek::Sunday,
-                        day: DayOfWeekOccurrence::Last,
-                        hour: 2,
-                        minute: 0,
-                        second: 0,
-                        milliseconds: 0,
-                    }),
-                    standard_bias: 0,
-                    daylight_name: String::from("Pacific Daylight Time"),
-                    daylight_date: Some(SystemTime {
-                        month: Month::April,
-                        day_of_week: DayOfWeek::Sunday,
-                        day: DayOfWeekOccurrence::First,
-                        hour: 2,
-                        minute: 0,
-                        second: 0,
-                        milliseconds: 0,
-                    }),
-                    daylight_bias: 0xffff_ffc4,
-                }),
-                performance_flags: Some(PerformanceFlags::DISABLE_WALLPAPER),
-                session_id: Some(0),
-                reconnect_cookie: calculate_reconnect_cookie(config),
-                .. Default::default()
-            },
+            optional_data: ExtendedClientOptionalInfo::default(),
         },
     };
-
-    let size = client_info.buffer_length();
-    let size2 = client_info.extra_info.optional_data.buffer_length();
-    let size3 = client_info.extra_info.optional_data.timezone.as_ref().unwrap().buffer_length();
-
-    info!("{} {} {}", size, size2, size3);
-    let mut buf = WriteBuf::new();
-    client_info.to_buffer(&mut buf).unwrap();
-    info!("{:?}", buf.filled());
 
     ClientInfoPdu {
         security_header,
         client_info,
     }
-}
-fn calculate_reconnect_cookie(config: &Config) -> Option<[u8; 28]> {
-    config.auto_reconnect.as_ref().map(|auto_reconnect| {
-        let mut data = Vec::new();
-        data.write_u32::<LittleEndian>(28).unwrap();
-        data.write_u32::<LittleEndian>(1).unwrap();
-        data.write_u32::<LittleEndian>(auto_reconnect.logon_id).unwrap();
-        let cookie = hmac(&auto_reconnect.random_bits, &[0u8; 32]);
-        data.write_all(&cookie).unwrap();
-        debug!("cookie: {:?} {:?}", auto_reconnect.random_bits, data);
-        data.try_into().unwrap()
-    })
 }
 
 fn create_client_confirm_active(
@@ -857,7 +802,7 @@ fn create_client_confirm_active(
     server_capability_sets.extend_from_slice(&[
         CapabilitySet::General(General {
             major_platform_type: config.platform,
-            extra_flags: GeneralExtraFlags::FASTPATH_OUTPUT_SUPPORTED | GeneralExtraFlags::NO_BITMAP_COMPRESSION_HDR | GeneralExtraFlags::AUTORECONNECT_SUPPORTED,
+            extra_flags: GeneralExtraFlags::FASTPATH_OUTPUT_SUPPORTED | GeneralExtraFlags::NO_BITMAP_COMPRESSION_HDR,
             ..Default::default()
         }),
         CapabilitySet::Bitmap(Bitmap {

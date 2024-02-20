@@ -208,8 +208,6 @@ impl RdpClient {
 
             for out in outputs {
                 match out {
-                    ActiveStageOutput::AutoReconnectInfo(reconnect) =>
-                        self.config.connector.auto_reconnect = Some(reconnect),
                     ActiveStageOutput::ResponseFrame(frame) => framed
                         .write_all(&frame)
                         .await

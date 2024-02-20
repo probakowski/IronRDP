@@ -1,11 +1,11 @@
 use std::cmp::min;
 use std::io::Read;
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 
 use ironrdp_graphics::color_conversion::{self, YCbCrBuffer};
 use ironrdp_graphics::rectangle_processing::Region;
 use ironrdp_graphics::{dwt, quantization, rlgr, subband_reconstruction};
-use ironrdp_pdu::codecs::rfx::{self, BlockType, EntropyAlgorithm, Headers, Quant, RfxRectangle, Tile};
+use ironrdp_pdu::codecs::rfx::{self, EntropyAlgorithm, Headers, Quant, RfxRectangle, Tile};
 use ironrdp_pdu::geometry::{InclusiveRectangle, Rectangle};
 use ironrdp_pdu::PduBufferParsing;
 
@@ -123,14 +123,14 @@ impl DecodingContext {
         }
         let region = region;
 
-        error!(frame_index = frame_begin.index);
-        error!(destination_rectangle = ?destination);
-        error!(context = ?self.context);
-        error!(channels = ?self.channels);
-        error!(?region);
+        debug!(frame_index = frame_begin.index);
+        trace!(destination_rectangle = ?destination);
+        trace!(context = ?self.context);
+        trace!(channels = ?self.channels);
+        trace!(?region);
 
         let clipping_rectangles = clipping_rectangles(region.rectangles.as_slice(), destination, width, height);
-        error!("Clipping rectangles: {:?}", clipping_rectangles);
+        trace!("Clipping rectangles: {:?}", clipping_rectangles);
 
         let mut final_update_rectangle = clipping_rectangles.extents.clone();
 

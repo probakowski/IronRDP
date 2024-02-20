@@ -337,7 +337,6 @@ impl Config {
             no_server_pointer: args.no_server_pointer,
             autologon: args.autologon,
             pointer_software_rendering: true,
-            auto_reconnect: None,
         };
 
         Ok(Self {

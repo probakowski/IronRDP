@@ -9,7 +9,7 @@ pub(crate) struct Handler;
 impl DynamicChannelDataHandler for Handler {
     fn process_complete_data(&mut self, complete_data: Vec<u8>) -> SessionResult<Option<Vec<u8>>> {
         let gfx_pdu = ServerPdu::from_buffer(&mut complete_data.as_slice())?;
-        info!("Got Display PDU: {:?}", gfx_pdu);
+        debug!("Got Display PDU: {:?}", gfx_pdu);
         Ok(None)
     }
 }

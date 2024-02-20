@@ -286,7 +286,6 @@ impl PduParsing for ExtendedClientOptionalInfo {
         if let Some(reconnection_cookie) = self.reconnect_cookie {
             stream.write_u16::<LittleEndian>(reconnection_cookie.len() as u16)?;
             stream.write_all(reconnection_cookie.as_ref())?;
-            stream.write_u32::<LittleEndian>(0)?;
         }
 
         Ok(())
@@ -521,7 +520,6 @@ bitflags! {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 pub enum AddressFamily {
     INet = 0x0002,
-    INet2 = 0x0004,
     INet6 = 0x0017,
 }
 

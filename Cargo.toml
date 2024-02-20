@@ -55,7 +55,7 @@ expect-test = "1"
 proptest = "1.4"
 rstest = "0.18"
 sspi = "0.11"
-tracing = { version = "0.1", features = ["log-always" ] }
+tracing = { version = "0.1", features = ["log"] }
 thiserror = "1.0"
 png = "0.17"
 bitflags = "2.4"

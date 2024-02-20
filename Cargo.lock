@@ -1755,12 +1755,9 @@ name = "ironrdp-connector"
 version = "0.1.0"
 dependencies = [
  "arbitrary",
- "byteorder",
- "hmac",
  "ironrdp-error",
  "ironrdp-pdu",
  "ironrdp-svc",
- "md-5",
  "rand_core",
  "sspi",
  "tracing",
@@ -1827,7 +1824,6 @@ dependencies = [
  "num-derive",
  "num-traits",
  "thiserror",
- "tracing",
 ]
 
 [[package]]
@@ -1902,7 +1898,6 @@ dependencies = [
  "ironrdp-acceptor",
  "ironrdp-ainput",
  "ironrdp-cliprdr",
- "ironrdp-connector",
  "ironrdp-dvc",
  "ironrdp-graphics",
  "ironrdp-pdu",
