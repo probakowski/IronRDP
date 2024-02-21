@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use ironrdp_pdu::write_buf::WriteBuf;
-use ironrdp_pdu::{rdp, x224, PduParsing};
+use ironrdp_pdu::{rdp, x224, PduParsing, PduEncode};
 
 use crate::{ConnectorError, ConnectorErrorExt as _, ConnectorResult};
 

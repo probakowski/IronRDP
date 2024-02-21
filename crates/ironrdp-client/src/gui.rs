@@ -225,7 +225,6 @@ impl GuiContext {
                     // TODO: is there something we should handle here?
                 }
                 Event::UserEvent(RdpOutputEvent::Image { buffer, width, height }) => {
-                    debug!("resizing to {}x{}", width, height);
                     surface
                         .resize(
                             NonZeroU32::new(u32::from(width)).unwrap(),

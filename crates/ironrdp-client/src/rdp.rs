@@ -110,9 +110,9 @@ impl RdpClient {
         let disconnect_reason = 'outer: loop {
             let outputs = tokio::select! {
             () = &mut resize_debounce, if resize.is_some() => {
-                (width, height) = resize.unwrap();
-                 width = std::cmp::max((width>>2)<<2, 200);
-                 height = std::cmp::max((height>>2)<<2, 200);
+                let (mut nwidth, mut nheight) = resize.unwrap();
+                 nwidth = std::cmp::max((nwidth>>2)<<2, 200);
+                 nheight = std::cmp::max((nheight>>2)<<2, 200);
 
                 let mut buf = WriteBuf::new();
                 let monitorLayoutPdu = ClientPdu::DisplayControlMonitorLayout(MonitorLayoutPdu {
@@ -120,10 +120,10 @@ impl RdpClient {
                         flags: MonitorFlags::PRIMARY,
                         left: 0,
                         top: 0,
-                        width: width as u32,
-                        height: height as u32,
-                        physical_width: width as u32,
-                        physical_height: height as u32,
+                        width: nwidth as u32,
+                        height: nheight as u32,
+                        physical_width: nwidth as u32,
+                        physical_height: nheight as u32,
                         orientation: Orientation::Landscape,
                         desktop_scale_factor: 100,
                         device_scale_factor: 100,
@@ -134,20 +134,24 @@ impl RdpClient {
                 let mut buf2 = WriteBuf::new();
                 let mut res = vec![];
                 if active_stage.encode_dynamic(&mut buf2, dvc::display::CHANNEL_NAME, buf.filled()).is_ok() {
-                        res.push(ActiveStageOutput::ResponseFrame(buf2.filled().to_vec()));
+                        let x=  buf2.filled();
+                        res.push(ActiveStageOutput::ResponseFrame(x.to_vec()));
+                        info!(nwidth, nheight, "resize event");
+                        info!("resize event {:?}", x);
+                        image = DecodedImage::new(
+                            PixelFormat::RgbA32,
+                            nwidth,
+                            nheight,
+                        );
+                        width = nwidth;
+                        height = nheight;
                 }
-                width = std::cmp::max(width, image.width());
-                height = std::cmp::max(height, image.height());
-                info!(width, height, "resize event");
-                image = DecodedImage::new(
-                    PixelFormat::RgbA32,
-                    width,
-                    height,
-                );
+
                 resize = None;
                 res
             }
             frame = framed.read_pdu() => {
+                    error!("frame received");
                 let (action, payload) = frame.map_err(|e| session::custom_err!("read frame", e))?;
                 trace!(?action, frame_length = payload.len(), "Frame received");
 
@@ -164,7 +168,6 @@ impl RdpClient {
                         Vec::new()
                     },
                     RdpInputEvent::FastPath(events) => {
-                        trace!(?events);
                         active_stage.process_fastpath_input(&mut image, &events)?
                     }
                     RdpInputEvent::Close => {
@@ -285,7 +288,7 @@ async fn connect(
 
     let mut connector = connector::ClientConnector::new(config.connector.clone())
         .with_server_addr(server_addr)
-        // .with_static_channel(ironrdp::dvc::DrdynvcClient::new())
+        .with_static_channel(ironrdp::dvc::DrdynvcClient::new())
         .with_static_channel(rdpsnd::Rdpsnd::new())
         .with_static_channel(rdpdr::Rdpdr::new(Box::new(NoopRdpdrBackend {}), "IronRDP".to_owned()).with_smartcard(0));
 

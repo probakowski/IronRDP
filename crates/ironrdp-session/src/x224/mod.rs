@@ -330,11 +330,21 @@ impl Processor {
             .get(channel_name)
             .ok_or_else(|| reason_err!("DVC", "access to non existing channel name: {}", channel_name))?;
 
+        self.channel_map.iter().for_each(|(id, chan)| {
+           info!("Channel: {} {}", id, chan);
+        });
+
+        self.dynamic_channels.iter().for_each(|(id, chan)| {
+            info!("Dynamic channel: {}", id);
+        });
+
         let dvc_channel = self
             .dynamic_channels
             .get(dvc_channel_id)
             .ok_or_else(|| reason_err!("DVC", "access to non existing channel: {}", dvc_channel_id))?;
 
+        info!("channel_id_type {:?}, channel_id {}, data_size {}", dvc_channel.channel_id_type,
+        dvc_channel.channel_id, dvc_data.len());
         let dvc_client_data = dvc::ClientPdu::Data(dvc::DataPdu {
             channel_id_type: dvc_channel.channel_id_type,
             channel_id: dvc_channel.channel_id,

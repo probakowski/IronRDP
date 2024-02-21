@@ -95,9 +95,9 @@ impl DecodingContext {
         destination: &InclusiveRectangle,
         input: &mut &[u8],
     ) -> SessionResult<(FrameId, InclusiveRectangle)> {
-        let channel = self.channels.0.first().unwrap();
-        let width = channel.width.as_u16();
-        let height = channel.height.as_u16();
+        self.channels.0.first().unwrap();
+        let width = image.width();
+        let height = image.height();
         let entropy_algorithm = self.context.entropy_algorithm;
 
         while input[0]!=0xC4 || input[1]!=0xCC {
