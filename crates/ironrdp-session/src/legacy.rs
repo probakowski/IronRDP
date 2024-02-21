@@ -22,13 +22,9 @@ pub fn encode_dvc_message(
     };
 
     let dvc_message = DvcMessage { channel_header, dvc_pdu, dvc_data };
-    let mut buff = WriteBuf::new();
-
-    dvc_message.to_buffer(&mut buff)?;
-    info!("initiator_id {}, drdynvc_id {}, dvc_message {:?}", initiator_id, drdynvc_id, buff.filled());
 
     let previous_length = buf.filled_len();
-    // [ TPKT | TPDU | SendDataRequest | vc::ChannelPduHeader | vc::dvc::ClientPdu | dvc_data ]
+    // [ TPKT | TPDU | SendDataRequest | vc::ChannelPduHeader | vc::dvc::ClientPdu | DvcData ]
     let written = encode_send_data_request(initiator_id, drdynvc_id, &dvc_message, buf).map_err(map_error)?;
     debug_assert_eq!(written, buf.filled_len()-previous_length);
 
