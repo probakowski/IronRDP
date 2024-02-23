@@ -1701,6 +1701,7 @@ dependencies = [
  "inquire",
  "ironrdp",
  "ironrdp-cliprdr-native",
+ "ironrdp-svc",
  "ironrdp-tls",
  "ironrdp-tokio",
  "proc-exit",
@@ -1856,6 +1857,7 @@ dependencies = [
  "sha1",
  "tap",
  "thiserror",
+ "tracing",
  "x509-cert",
 ]
 

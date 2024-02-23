@@ -1,10 +1,7 @@
 use ironrdp_connector::credssp::{CredsspProcessGenerator, CredsspSequence, KerberosConfig};
 use ironrdp_connector::sspi::credssp::ClientState;
 use ironrdp_connector::sspi::generator::GeneratorState;
-use ironrdp_connector::{
-    custom_err, ClientConnector, ClientConnectorState, ConnectionResult, ConnectorError, ConnectorResult,
-    Sequence as _, ServerName, State as _,
-};
+use ironrdp_connector::{custom_err, ClientConnector, ClientConnectorState, ConnectionResult, ConnectorError, ConnectorResult, Sequence as _, ServerName, State as _, Written};
 use ironrdp_pdu::write_buf::WriteBuf;
 
 use crate::framed::{Framed, FramedRead, FramedWrite};
@@ -46,7 +43,6 @@ pub fn mark_as_upgraded(_: ShouldUpgrade, connector: &mut ClientConnector) -> Up
 
 #[instrument(skip_all)]
 pub async fn connect_finalize<S>(
-    _: Upgraded,
     framed: &mut Framed<S>,
     mut connector: ClientConnector,
     server_name: ServerName,
@@ -72,6 +68,28 @@ where
         .await?;
     }
 
+    let result = loop {
+        single_connect_step(framed, &mut connector, &mut buf).await?;
+
+        if let ClientConnectorState::Connected { result } = connector.state {
+            break result;
+        }
+    };
+
+    info!("Connected with success");
+
+    Ok(result)
+}
+
+#[instrument(skip_all)]
+pub async fn connect_finalize_no_credssp<S>(
+    framed: &mut Framed<S>,
+    mut connector: ClientConnector
+)    -> ConnectorResult<ConnectionResult>
+    where
+        S: FramedRead + FramedWrite,
+{
+    let mut buf = WriteBuf::new();
     let result = loop {
         single_connect_step(framed, &mut connector, &mut buf).await?;
 
@@ -186,9 +204,27 @@ pub async fn single_connect_step<S>(
 where
     S: FramedWrite + FramedRead,
 {
+    let written = single_connect_step_read(framed, connector, buf).await?;
+
+    if let Some(response_len) = written.size() {
+        debug_assert_eq!(buf.filled_len(), response_len);
+        let response = buf.filled();
+        trace!(response_len, "Send response");
+        framed
+            .write_all(response)
+            .await
+            .map_err(|e| ironrdp_connector::custom_err!("write all", e))?;
+    }
+
+    Ok(())
+}
+
+pub async fn single_connect_step_read<S>(framed: &mut Framed<S>, connector: &mut ClientConnector, buf: &mut WriteBuf) -> ConnectorResult<Written>
+    where S: FramedRead
+{
     buf.clear();
 
-    let written = if let Some(next_pdu_hint) = connector.next_pdu_hint() {
+    if let Some(next_pdu_hint) = connector.next_pdu_hint() {
         debug!(
             connector.state = connector.state.name(),
             hint = ?next_pdu_hint,
@@ -202,20 +238,8 @@ where
 
         trace!(length = pdu.len(), "PDU received");
 
-        connector.step(&pdu, buf)?
+        connector.step(&pdu, buf)
     } else {
-        connector.step_no_input(buf)?
-    };
-
-    if let Some(response_len) = written.size() {
-        debug_assert_eq!(buf.filled_len(), response_len);
-        let response = buf.filled();
-        trace!(response_len, "Send response");
-        framed
-            .write_all(response)
-            .await
-            .map_err(|e| ironrdp_connector::custom_err!("write all", e))?;
+        connector.step_no_input(buf)
     }
-
-    Ok(())
 }

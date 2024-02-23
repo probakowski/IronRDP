@@ -1,6 +1,4 @@
 use std::cmp::min;
-use std::io::Read;
-use byteorder::{LittleEndian, ReadBytesExt};
 
 use ironrdp_graphics::color_conversion::{self, YCbCrBuffer};
 use ironrdp_graphics::rectangle_processing::Region;
@@ -17,7 +15,6 @@ const TILE_SIZE: u16 = 64;
 pub type FrameId = u32;
 
 pub struct DecodingContext {
-    state: SequenceState,
     context: rfx::ContextPdu,
     channels: rfx::ChannelsPdu,
     decoding_tiles: DecodingTileContext,
@@ -26,7 +23,6 @@ pub struct DecodingContext {
 impl Default for DecodingContext {
     fn default() -> Self {
         Self {
-            state: SequenceState::HeaderMessages,
             context: rfx::ContextPdu {
                 flags: rfx::OperatingMode::empty(),
                 entropy_algorithm: rfx::EntropyAlgorithm::Rlgr1,
@@ -49,13 +45,10 @@ impl DecodingContext {
         input: &mut &[u8],
     ) -> SessionResult<(FrameId, InclusiveRectangle)> {
         loop {
-            match self.state {
-                SequenceState::HeaderMessages => {
-                    self.process_headers(input)?;
-                }
-                SequenceState::DataMessages => {
-                    return self.process_data_messages(image, destination, input);
-                }
+            if input[0] == 0xC4 && input[1]== 0xCC {
+                return self.process_data_messages(image, destination, input);
+            } else {
+                self.process_headers(input)?;
             }
         }
     }
@@ -83,7 +76,6 @@ impl DecodingContext {
 
         self.context = context;
         self.channels = channels;
-        self.state = SequenceState::DataMessages;
 
         Ok(())
     }
@@ -100,14 +92,6 @@ impl DecodingContext {
         let height = image.height();
         let entropy_algorithm = self.context.entropy_algorithm;
 
-        while input[0]!=0xC4 || input[1]!=0xCC {
-            let block_type = input.read_u16::<LittleEndian>().unwrap();
-            let block_len = input.read_u32::<LittleEndian>().unwrap();
-            _=block_type;
-            error!(?block_type, ?block_len, "non-begin block");
-            let mut v = vec![0u8; (block_len - 6) as usize];
-            input.read_exact(&mut v).unwrap();
-        }
         let frame_begin = rfx::FrameBeginPdu::from_buffer_consume(input)?;
         let mut region = rfx::RegionPdu::from_buffer_consume(input)?;
         let tile_set = rfx::TileSetPdu::from_buffer_consume(input)?;
@@ -153,10 +137,6 @@ impl DecodingContext {
             )?;
 
             final_update_rectangle = final_update_rectangle.union(&current_update_rectangle);
-        }
-
-        if self.context.flags.contains(rfx::OperatingMode::IMAGE_MODE) {
-            self.state = SequenceState::HeaderMessages;
         }
 
         Ok((frame_begin.index, final_update_rectangle))

@@ -179,8 +179,9 @@ pub struct ExtendedClientInfo {
 
 impl ExtendedClientInfo {
     fn from_buffer(mut stream: impl io::Read, character_set: CharacterSet) -> Result<Self, ClientInfoError> {
+        let i = stream.read_u16::<LittleEndian>()?;
         let address_family =
-            AddressFamily::from_u16(stream.read_u16::<LittleEndian>()?).ok_or(ClientInfoError::InvalidAddressFamily)?;
+            AddressFamily::from_u16(i).unwrap_or(AddressFamily::INet);
 
         // This size includes the length of the mandatory null terminator.
         let address_size = stream.read_u16::<LittleEndian>()? as usize;

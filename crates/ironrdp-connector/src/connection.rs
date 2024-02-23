@@ -809,7 +809,7 @@ fn create_client_confirm_active(
             pref_bits_per_pix: 32,
             desktop_width: config.desktop_size.width,
             desktop_height: config.desktop_size.height,
-            desktop_resize_flag: false,
+            desktop_resize_flag: true,
             drawing_flags,
         }),
         CapabilitySet::Order(Order::new(

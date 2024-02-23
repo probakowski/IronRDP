@@ -32,6 +32,7 @@ ironrdp = { workspace = true, features = ["input", "graphics", "dvc", "rdpdr", "
 ironrdp-cliprdr-native.workspace = true
 ironrdp-tls.workspace = true
 ironrdp-tokio.workspace = true
+ironrdp-svc.workspace = true
 sspi = { workspace = true, features = ["network_client", "dns_resolver"] } # enable additional features
 
 # Windowing and rendering

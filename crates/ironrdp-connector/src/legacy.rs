@@ -1,6 +1,8 @@
 //! Legacy compat layer based on the old PduParsing trait
 
 use std::borrow::Cow;
+use std::error::Error;
+use std::fmt::{Debug, Display, Formatter};
 
 use ironrdp_pdu::write_buf::WriteBuf;
 use ironrdp_pdu::{rdp, x224, PduParsing};
@@ -177,8 +179,32 @@ pub struct ShareDataCtx {
     pub pdu: rdp::headers::ShareDataPdu,
 }
 
+pub struct DeactivateAllError;
+
+impl Debug for DeactivateAllError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeactivateAllError")?;
+        Ok(())
+    }
+}
+
+impl Display for DeactivateAllError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DeactivateAllError")?;
+        Ok(())
+    }
+}
+
+impl Error for DeactivateAllError {
+
+}
+
 pub fn decode_share_data(ctx: SendDataIndicationCtx<'_>) -> ConnectorResult<ShareDataCtx> {
     let ctx = decode_share_control(ctx)?;
+
+    if let rdp::headers::ShareControlPdu::ServerDeactivateAll(_) = ctx.pdu {
+        return  Err(custom_err!("Server Deactivate All", DeactivateAllError))
+    }
 
     let rdp::headers::ShareControlPdu::Data(share_data_header) = ctx.pdu else {
         return Err(general_err!(

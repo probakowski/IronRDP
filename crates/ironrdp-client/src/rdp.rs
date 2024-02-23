@@ -1,6 +1,8 @@
+use std::default::Default;
+use std::error::Error;
 use std::time::Duration;
 use ironrdp::cliprdr::backend::{ClipboardMessage, CliprdrBackendFactory};
-use ironrdp::connector::{ConnectionResult, ConnectorResult};
+use ironrdp::connector::{ClientConnector, ConnectionResult, ConnectorResult};
 use ironrdp::graphics::image_processing::PixelFormat;
 use ironrdp::pdu::input::fast_path::FastPathInputEvent;
 use ironrdp::session::image::DecodedImage;
@@ -12,10 +14,14 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 use winit::event_loop::EventLoopProxy;
+use ironrdp::connector::ClientConnectorState::CapabilitiesExchange;
+use ironrdp::connector::legacy::DeactivateAllError;
 use ironrdp::pdu::{dvc, PduParsing};
 use ironrdp::pdu::dvc::display::{Monitor, MonitorFlags, Orientation};
 use ironrdp::pdu::write_buf::WriteBuf;
 use ironrdp::pdu::rdp::vc::dvc::display::ClientPdu;
+use ironrdp_svc::StaticChannelSet;
+use ironrdp_tokio::connect_finalize_no_credssp;
 use crate::rdp::dvc::display::MonitorLayoutPdu;
 
 use crate::config::Config;
@@ -54,16 +60,17 @@ pub struct RdpClient {
 impl RdpClient {
     pub async fn run(mut self) {
         loop {
-            let (connection_result, framed) = match connect(&self.config, self.cliprdr_factory.as_deref()).await {
-                Ok(result) => result,
-                Err(e) => {
-                    let _ = self.event_loop_proxy.send_event(RdpOutputEvent::ConnectionFailure(e));
-                    break;
+            let (connection_result, mut framed) =
+                match connect(&self.config, self.cliprdr_factory.as_deref()).await {
+                    Ok(result) => result,
+                    Err(e) => {
+                        let _ = self.event_loop_proxy.send_event(RdpOutputEvent::ConnectionFailure(e));
+                        break;
                 }
             };
 
             match self.active_session(
-                framed,
+                &mut framed,
                 connection_result,
             )
                 .await
@@ -86,7 +93,7 @@ impl RdpClient {
 
     async fn active_session(
         &mut self,
-        mut framed: UpgradedFramed,
+        mut framed: &mut UpgradedFramed,
         connection_result: ConnectionResult,
     ) -> SessionResult<RdpControlFlow> {
         let mut image = DecodedImage::new(
@@ -100,6 +107,9 @@ impl RdpClient {
 
         info!(width=connection_result.desktop_size.width, height=connection_result.desktop_size.height, "image");
         info!(width=self.config.connector.desktop_size.width, height=self.config.connector.desktop_size.height, "image");
+
+        let io = connection_result.io_channel_id;
+        let user = connection_result.user_channel_id;
 
         let mut active_stage = ActiveStage::new(connection_result, None);
 
@@ -122,8 +132,8 @@ impl RdpClient {
                         top: 0,
                         width: nwidth as u32,
                         height: nheight as u32,
-                        physical_width: nwidth as u32,
-                        physical_height: nheight as u32,
+                        physical_width: 0u32,
+                        physical_height: 0u32,
                         orientation: Orientation::Landscape,
                         desktop_scale_factor: 100,
                         device_scale_factor: 100,
@@ -151,11 +161,29 @@ impl RdpClient {
                 res
             }
             frame = framed.read_pdu() => {
-                    error!("frame received");
                 let (action, payload) = frame.map_err(|e| session::custom_err!("read frame", e))?;
                 trace!(?action, frame_length = payload.len(), "Frame received");
-
-                active_stage.process(&mut image, action, &payload)?
+                match active_stage.process(&mut image, action, &payload) {
+                        Ok(res) => res,
+                        Err(e) => {
+                            if let Some(ee) = e.source() {
+                                if ee.is::<DeactivateAllError>(){
+                                            let connector = ClientConnector {
+                                                config: self.config.connector.clone(),
+                                                state: CapabilitiesExchange {io_channel_id: io, user_channel_id: user},
+                                                server_addr: None,
+                                                static_channels: Default::default(),
+                                            };
+                                    connect_finalize_no_credssp(framed, connector).await.map_err(|e| session::custom_err!("FINALIZE", e))?;
+                                    Vec::new()
+                                } else {
+                                    return Err(e);
+                                }
+                            } else {
+                             return Err(e);
+                            }
+                        }
+                    }
             }
             input_event = self.input_event_receiver.recv() => {
                 let input_event = input_event.ok_or_else(|| session::general_err!("GUI is stopped"))?;
@@ -317,7 +345,6 @@ async fn connect(
 
     let mut network_client = crate::network_client::ReqwestNetworkClient::new();
     let connection_result = ironrdp_tokio::connect_finalize(
-        upgraded,
         &mut upgraded_framed,
         connector,
         (&config.destination).into(),

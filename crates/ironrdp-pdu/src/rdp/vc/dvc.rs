@@ -4,6 +4,7 @@ use bit_field::BitField;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
+use tracing::info;
 
 use super::ChannelError;
 use crate::PduParsing;
@@ -271,7 +272,6 @@ impl PduParsing for Header {
         dvc_header.set_bits(2..4, self.pdu_dependent);
         dvc_header.set_bits(4..8, self.pdu_type.to_u8().unwrap());
         stream.write_u8(dvc_header)?;
-
         Ok(())
     }
 

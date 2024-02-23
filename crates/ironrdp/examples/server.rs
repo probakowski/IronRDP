@@ -138,8 +138,8 @@ impl RdpServerInputHandler for Handler {
     }
 }
 
-const WIDTH: u16 = 1920;
-const HEIGHT: u16 = 1080;
+const WIDTH: u16 = 800;
+const HEIGHT: u16 = 600;
 
 struct DisplayUpdates;
 

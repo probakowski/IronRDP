@@ -1,4 +1,6 @@
+use std::hash::Hasher;
 use std::io;
+use std::io::{Read, Write};
 
 use byteorder::{LittleEndian, ReadBytesExt as _, WriteBytesExt as _};
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -58,6 +60,29 @@ const CAPABILITY_SET_LENGTH_FIELD_SIZE: usize = 2;
 const ORIGINATOR_ID_FIELD_SIZE: usize = 2;
 
 const NULL_TERMINATOR: &str = "\0";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerDeactivateAll;
+
+impl PduParsing for ServerDeactivateAll {
+    type Error = CapabilitySetsError;
+
+    fn from_buffer(mut stream: impl Read) -> Result<Self, Self::Error> {
+        let source_descriptor_length = stream.read_u16::<LittleEndian>()? as usize;
+        let mut v = vec![0u8; source_descriptor_length];
+        stream.read_exact(v.as_mut_slice())?;
+        Ok(ServerDeactivateAll{})
+    }
+
+    fn to_buffer(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        stream.write_u16::<LittleEndian>(0)?;
+        Ok(())
+    }
+
+    fn buffer_length(&self) -> usize {
+        2
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerDemandActive {

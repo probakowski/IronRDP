@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use ironrdp_connector::legacy::SendDataIndicationCtx;
 use ironrdp_connector::GraphicsConfig;
-use ironrdp_pdu::dvc::FieldType;
+use ironrdp_pdu::dvc::{CreateRequestPdu, CreateResponsePdu, FieldType};
 use ironrdp_pdu::mcs::{DisconnectProviderUltimatum, DisconnectReason, McsMessage};
 use ironrdp_pdu::rdp::headers::ShareDataPdu;
 use ironrdp_pdu::rdp::server_error_info::{ErrorInfo, ProtocolIndependentCode, ServerSetErrorInfoPdu};
@@ -21,6 +21,8 @@ pub use self::gfx::GfxHandler;
 
 pub const RDP8_GRAPHICS_PIPELINE_NAME: &str = "Microsoft::Windows::RDS::Graphics";
 pub const RDP8_DISPLAY_PIPELINE_NAME: &str = "Microsoft::Windows::RDS::DisplayControl";
+
+pub const AUDIO_PLAYBACK_NAME: &str = "AUDIO_PLAYBACK_DVC";
 
 /// X224 Processor output
 #[derive(Debug, Clone)]
@@ -123,6 +125,9 @@ impl Processor {
         let ctx = ironrdp_connector::legacy::decode_share_data(data_ctx).map_err(crate::legacy::map_error)?;
 
         match ctx.pdu {
+            ShareDataPdu::Synchronize(_) => {
+                Ok(Vec::new())
+            }
             ShareDataPdu::SaveSessionInfo(session_info) => {
                 debug!("Got Session Save Info PDU: {session_info:?}");
                 Ok(Vec::new())
@@ -200,6 +205,12 @@ impl Processor {
             }
             dvc::ServerPdu::CreateRequest(create_request) => {
                 debug!("Got DVC Create Request PDU: {create_request:?}");
+
+                let create_request = CreateRequestPdu {
+                    channel_id_type: FieldType::U8,
+                    channel_id: create_request.channel_id,
+                    channel_name: create_request.channel_name,
+                };
 
                 let creation_status = if let Some(dynamic_channel) = create_dvc(
                     create_request.channel_name.as_str(),
@@ -381,6 +392,15 @@ fn process_svc_messages(messages: Vec<SvcMessage>, channel_id: u16, initiator_id
     client_encode_svc_messages(messages, channel_id, initiator_id).map_err(crate::SessionError::pdu)
 }
 
+struct AudioHandler;
+
+impl DynamicChannelDataHandler for AudioHandler {
+    fn process_complete_data(&mut self, complete_data: Vec<u8>) -> SessionResult<Option<Vec<u8>>> {
+        debug!("audio data {:?}", complete_data);
+        Ok(None)
+    }
+}
+
 fn create_dvc(
     channel_name: &str,
     channel_id: u32,
@@ -398,6 +418,11 @@ fn create_dvc(
         }
         RDP8_DISPLAY_PIPELINE_NAME => Some(DynamicChannel::new(
             Box::new(display::Handler),
+            channel_id,
+            channel_id_type,
+        )),
+        AUDIO_PLAYBACK_NAME => Some(DynamicChannel::new(
+            Box::new(AudioHandler{}),
             channel_id,
             channel_id_type,
         )),

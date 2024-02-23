@@ -7,7 +7,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::codecs::rfx::FrameAcknowledgePdu;
 use crate::input::InputEventPdu;
-use crate::rdp::capability_sets::{ClientConfirmActive, ServerDemandActive};
+use crate::rdp::capability_sets::{ClientConfirmActive, ServerDeactivateAll, ServerDemandActive};
 use crate::rdp::finalization_messages::{ControlPdu, FontPdu, MonitorLayoutPdu, SynchronizePdu};
 use crate::rdp::refresh_rectangle::RefreshRectanglePdu;
 use crate::rdp::server_error_info::ServerSetErrorInfoPdu;
@@ -130,6 +130,7 @@ impl PduParsing for ShareControlHeader {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShareControlPdu {
+    ServerDeactivateAll(ServerDeactivateAll),
     ServerDemandActive(ServerDemandActive),
     ClientConfirmActive(ClientConfirmActive),
     Data(ShareDataHeader),
@@ -138,6 +139,7 @@ pub enum ShareControlPdu {
 impl ShareControlPdu {
     pub fn as_short_name(&self) -> &str {
         match self {
+            ShareControlPdu::ServerDeactivateAll(_) => "Server Deactivate All PDU",
             ShareControlPdu::ServerDemandActive(_) => "Server Demand Active PDU",
             ShareControlPdu::ClientConfirmActive(_) => "Client Confirm Active PDU",
             ShareControlPdu::Data(_) => "Data PDU",
@@ -148,6 +150,9 @@ impl ShareControlPdu {
 impl ShareControlPdu {
     pub fn from_type(mut stream: impl io::Read, share_type: ShareControlPduType) -> Result<Self, RdpError> {
         match share_type {
+            ShareControlPduType::DeactivateAllPdu => Ok(ShareControlPdu::ServerDeactivateAll(
+                ServerDeactivateAll::from_buffer(&mut stream)?
+            )),
             ShareControlPduType::DemandActivePdu => Ok(ShareControlPdu::ServerDemandActive(
                 ServerDemandActive::from_buffer(&mut stream)?,
             )),
@@ -160,6 +165,7 @@ impl ShareControlPdu {
     }
     pub fn to_buffer(&self, mut stream: impl io::Write) -> Result<(), RdpError> {
         match self {
+            ShareControlPdu::ServerDeactivateAll(pdu) => pdu.to_buffer(&mut stream).map_err(RdpError::from),
             ShareControlPdu::ServerDemandActive(pdu) => pdu.to_buffer(&mut stream).map_err(RdpError::from),
             ShareControlPdu::ClientConfirmActive(pdu) => pdu.to_buffer(&mut stream).map_err(RdpError::from),
             ShareControlPdu::Data(share_data_header) => share_data_header.to_buffer(&mut stream),
@@ -167,6 +173,7 @@ impl ShareControlPdu {
     }
     pub fn buffer_length(&self) -> usize {
         match self {
+            ShareControlPdu::ServerDeactivateAll(pdu) => pdu.buffer_length(),
             ShareControlPdu::ServerDemandActive(pdu) => pdu.buffer_length(),
             ShareControlPdu::ClientConfirmActive(pdu) => pdu.buffer_length(),
             ShareControlPdu::Data(share_data_header) => share_data_header.buffer_length(),
@@ -174,6 +181,7 @@ impl ShareControlPdu {
     }
     pub fn share_header_type(&self) -> ShareControlPduType {
         match self {
+            ShareControlPdu::ServerDeactivateAll(_) => ShareControlPduType::DeactivateAllPdu,
             ShareControlPdu::ServerDemandActive(_) => ShareControlPduType::DemandActivePdu,
             ShareControlPdu::ClientConfirmActive(_) => ShareControlPduType::ConfirmActivePdu,
             ShareControlPdu::Data(_) => ShareControlPduType::DataPdu,

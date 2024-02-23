@@ -454,8 +454,6 @@ impl DecodedImage {
         update_rectangle: &InclusiveRectangle,
         width: u16,
     ) -> SessionResult<InclusiveRectangle> {
-        debug!("Tile: {:?}", update_rectangle);
-
         let pointer_rendering_state = self.pointer_rendering_begin(&clipping_rectangles.extents)?;
 
         let update_region = clipping_rectangles.intersect_rectangle(update_rectangle);
@@ -480,9 +478,6 @@ impl DecodedImage {
                 pixel_format: self.pixel_format,
                 data: &mut self.data,
             };
-
-            debug!("Source image region: {:?}", source_image_region.region);
-            debug!("Destination image region: {:?}", destination_image_region.region);
 
             source_image_region
                 .copy_to(&mut destination_image_region)

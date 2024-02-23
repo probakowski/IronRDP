@@ -69,6 +69,11 @@ impl Processor {
         let update_pdu = decode_cursor::<FastPathUpdatePdu<'_>>(&mut input).map_err(SessionError::pdu)?;
         trace!(fast_path_update_fragmentation = ?update_pdu.fragmentation);
 
+        if header.data_length == 19 || header.data_length == 16 {
+            let x = 5;
+            debug!("16 {}", x);
+        }
+
         let processed_complete_data = self
             .complete_data
             .process_data(update_pdu.data, update_pdu.fragmentation);
@@ -78,6 +83,10 @@ impl Processor {
         let Some(data) = processed_complete_data else {
             return Ok(Vec::new());
         };
+
+        if data.len() < 200 {
+            debug!(data = ?data, "data");
+        }
 
         let update = FastPathUpdate::decode_with_code(data.as_slice(), update_code);
 
@@ -343,7 +352,8 @@ impl Processor {
                             let ext_data = bits.extended_bitmap_data;
                             match ext_data.bpp {
                                 32 => {
-                                    image.apply_rgb32_bitmap(ext_data.data, PixelFormat::BgrX32, &destination)?;
+                                    let rectangle = image.apply_rgb32_bitmap(ext_data.data, PixelFormat::BgrX32, &destination)?;
+                                    update_rectangle = update_rectangle.union(&rectangle);
                                 }
                                 bpp => {
                                     warn!("Unsupported bpp: {bpp}")
